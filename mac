@@ -1,0 +1,64 @@
+#!/bin/bash
+
+echo "🔒 启动 Boundless 安装脚本（macOS 增强安全版）..."
+
+# ⚠️ 关闭历史记录，防止记录私钥
+set +o history
+
+# 用户输入 RPC
+read -p "📡 请输入 Base 主网 RPC 地址（必须以 https:// 开头）: " RPC_URL
+if [[ ! $RPC_URL =~ ^https:// ]]; then
+  echo "❌ 错误：RPC 地址必须以 https:// 开头！"
+  exit 1
+fi
+echo "✅ 你输入的 RPC 是：$RPC_URL"
+
+# 用户输入私钥
+read -p "🔐 请输入钱包私钥（不会保存）: " PRIVATE_KEY
+echo "🔐 私钥已读取。"
+
+# 恢复历史记录功能
+set -o history
+
+echo "⚠️ 注意：本脚本不会保存私钥或 RPC 信息，操作完成后请手动妥善保管！"
+
+# 安装 Rust
+echo "📦 安装 Rust..."
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+
+# 安装 Risc0 工具链
+echo "📦 安装 Risc0..."
+curl -L https://risczero.com/install | bash
+source ~/.zshrc
+rzup install
+
+# 克隆 Boundless 仓库
+echo "📂 克隆 Boundless 仓库..."
+git clone https://github.com/boundless-xyz/boundless
+cd boundless
+git checkout release-0.10
+
+# 安装 bento-client
+echo "📦 安装 bento-client..."
+cargo install --git https://github.com/risc0/risc0 bento-client --bin bento_cli
+
+# 更新 PATH（写入 .zshrc）
+echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# 安装 Boundless CLI
+echo "📦 安装 boundless-cli..."
+cargo install --locked boundless-cli
+
+# ✅ 使用变量执行 CLI 命令
+export RPC_URL="$RPC_URL"
+export PRIVATE_KEY="$PRIVATE_KEY"
+
+echo "🚀 开始 USDC 质押（1 枚）..."
+boundless --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" account deposit-stake 1
+
+echo "🚀 开始 ETH 存款（0.001 枚）..."
+boundless --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" account deposit 0.001
+
+echo "🎉 所有操作已完成（未保存私钥）！请妥善保管你的私钥。"
